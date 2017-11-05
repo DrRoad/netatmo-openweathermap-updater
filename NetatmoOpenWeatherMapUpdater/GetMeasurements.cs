@@ -78,7 +78,6 @@ namespace NetatmoOpenWeatherMapUpdater
             {
                 ts = DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).UtcDateTime.ToString(DateTimeFormat);
             }
-            //var pressure = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Pressure;
             log.Info($"Got measurements: timestamp (UTC) = {ts}, temperature = {temperature}, humidity = {humidity}");
 
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it

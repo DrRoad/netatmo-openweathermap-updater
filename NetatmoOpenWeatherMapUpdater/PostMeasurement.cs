@@ -4,6 +4,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
 using System.Net.Http;
 using System.Collections.Generic;
+using System.Text;
 
 namespace NetatmoOpenWeatherMapUpdater
 {
@@ -20,21 +21,13 @@ namespace NetatmoOpenWeatherMapUpdater
 
         // ?APPID={{key}}
         [FunctionName("PostMeasurement")]
-        public static async void Run(
+        public static async Task Run(
             [QueueTrigger("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")]NetatmoStationData measurements,
             TraceWriter log)
         {
             log.Info($"Posting measurements to OpenWeatherMap at: {DateTime.Now.ToString(DateTimeFormat)}");
 
-            var success = await PostMeasurementToOpenWeatherMap(measurements, log);
-            if (success)
-            {
-                log.Info($"Posted NetAtmo measurement succesfully to OpenWeatherMap");
-            }
-            else
-            {
-                log.Error($"ERROR Posting NetAtmo measurement succesfully to OpenWeatherMap");
-            }
+            await PostMeasurementToOpenWeatherMap(measurements, log);
         }
 
         private static async Task<bool> PostMeasurementToOpenWeatherMap(NetatmoStationData measurements, TraceWriter log)
@@ -62,17 +55,19 @@ namespace NetatmoOpenWeatherMapUpdater
                 {
 
                     log.Info($"Post JSON: {postJSON}");
-                    var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = new StringContent(postJSON) };
+                    var request = new HttpRequestMessage(HttpMethod.Post, uri) {
+                        Content = new StringContent(postJSON, Encoding.UTF8, "application/json")
+                    };
                     var response = await http.SendAsync(request);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        log.Info($"Measurement posted succesfully.");
+                        log.Info($"Measurement posted succesfully. {response.StatusCode} - {response.ReasonPhrase}");
                         success = true;
                     }
                     else
                     {
-                        log.Error($"ERROR posting measurement: HTTP Status {response.StatusCode} - {response.ReasonPhrase}");
+                        log.Error($"ERROR posting measurement: {response.StatusCode} - {response.ReasonPhrase}");
                         success = false;
                     }
                 } else
