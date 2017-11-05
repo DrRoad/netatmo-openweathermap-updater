@@ -40,6 +40,7 @@ namespace NetatmoOpenWeatherMapUpdater
             [TimerTrigger("0 0 * * * *")]TimerInfo myTimer,
             [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
             [Queue("%QUEUE_SLACK%", Connection = "StorageConnectionString")] ICollector<string> outputToSlack,
+            [Table("%TABLE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> tableStorage,
             TraceWriter log)
         {
             log.Info($"Getting measurements from Netatmo weather station at: {DateTime.Now.ToString(DateTimeFormat)}");
@@ -83,13 +84,16 @@ namespace NetatmoOpenWeatherMapUpdater
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
             queueToOpenWeatherMap.Add(measurements);
 
-            var messageToSlack = new {
-                TimestampUtc = ts,
-                Temperature = temperature.Value,
-                Humidity = humidity.Value
-            };
+            tableStorage.Add(measurements);
+
             var postToSlack = Environment.GetEnvironmentVariable(EnvPostToSlack);
-            if (!string.IsNullOrEmpty(postToSlack) && postToSlack.Equals("true")) { 
+            if (!string.IsNullOrEmpty(postToSlack) && postToSlack.Equals("true")) {
+                var messageToSlack = new
+                {
+                    TimestampUtc = ts,
+                    Temperature = temperature.Value,
+                    Humidity = humidity.Value
+                };
                 outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
             }
         }

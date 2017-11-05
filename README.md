@@ -6,7 +6,7 @@ Azure Functions app to get data from a NetAtmo weather station and update it to 
 The application consists of two independent functions
 
 1. **GetMeasurement**
-  This function accesses the latest weather measurement from your NetAtmo weather station and publishes it to a Storage Queue. As a secondary function it posts a simple JSON message to another queue where a Logic App posts it to Slack. You can disable this by setting POST_TO_SLACK environment variable to "false".
+  This function accesses the latest weather measurement from your NetAtmo weather station and publishes it to a Storage Queue. As a secondary function it posts a simple JSON message to another queue where a Logic App posts it to Slack. You can disable this by setting POST_TO_SLACK environment variable to "false". The function also stores each NetAtmo measurements message to Table Storage for later analysis.
 
 2. **PostMeasurement**
   This functions listens on the Storage Queue. When a new measurement is published in the queue it processes it and posts the data to OpenWeatherMap.
@@ -24,6 +24,7 @@ NETATMO_PASSWORD == your NetAtmo password
 NETATMO_STATION_ID == The station id for your NetAtmo station
 
 QUEUE_MEASUREMENTS == Queue name used to publish measurements between the two functions
+TABLE_MEASUREMENTS == Table Storage table name where to store each NetAtmo measurement message
 
 OPENWEATHERMAP_KEY == OpenWeatherMap API key
 OPENWEATHERMAP_STATION_ID == Station Id you get back when you create your station first via the API.
