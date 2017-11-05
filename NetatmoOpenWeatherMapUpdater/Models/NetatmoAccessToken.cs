@@ -26,11 +26,6 @@
         public static NetatmoAccessToken FromJson(string json) => JsonConvert.DeserializeObject<NetatmoAccessToken>(json, NetatmoAccessTokenDataConverter.Settings);
     }
 
-    public static class SerializeNetatmoAccessToken
-    {
-        public static string ToJson(this NetatmoAccessToken self) => JsonConvert.SerializeObject(self, NetatmoAccessTokenDataConverter.Settings);
-    }
-
     public class NetatmoAccessTokenDataConverter
     {
         public static readonly JsonSerializerSettings Settings = new JsonSerializerSettings

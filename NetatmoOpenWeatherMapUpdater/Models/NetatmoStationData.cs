@@ -1,5 +1,6 @@
 ﻿namespace NetatmoOpenWeatherMapUpdater
 {
+    using Microsoft.WindowsAzure.Storage.Table;
     using Newtonsoft.Json;
     using System.Collections.Generic;
 
@@ -243,11 +244,6 @@
     public partial class NetatmoStationData
     {
         public static NetatmoStationData FromJson(string json) => JsonConvert.DeserializeObject<NetatmoStationData>(json, NetatmoStationDataConverter.Settings);
-    }
-
-    public static class SerializeNetatmoStationData
-    {
-        public static string ToJson(this NetatmoStationData self) => JsonConvert.SerializeObject(self, NetatmoStationDataConverter.Settings);
     }
 
     public class NetatmoStationDataConverter

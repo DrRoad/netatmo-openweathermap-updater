@@ -5,10 +5,11 @@ using Microsoft.Azure.WebJobs.Host;
 using System.Net.Http;
 using System.Collections.Generic;
 using System.Text;
+using NetatmoOpenWeatherMapUpdater.Helpers;
 
 namespace NetatmoOpenWeatherMapUpdater
 {
-    public static class PostMeasurement
+    public static class PostMeasurementToOpenWeatherMap
     {
         // Names of the environment variables to get the values from
         private const string EnvOpenWeatherMapAppKey = "OPENWEATHERMAP_KEY";
@@ -19,17 +20,17 @@ namespace NetatmoOpenWeatherMapUpdater
 
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
-        [FunctionName("PostMeasurement")]
+        [FunctionName("UpdateOpenWeatherMap")]
         public static async Task Run(
             [QueueTrigger("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")]NetatmoStationData measurements,
             TraceWriter log)
         {
             log.Info($"Posting measurements to OpenWeatherMap at: {DateTime.Now.ToString(DateTimeFormat)}");
 
-            await PostMeasurementToOpenWeatherMap(measurements, log);
+            await PostMeasurement(measurements, log);
         }
 
-        private static async Task<bool> PostMeasurementToOpenWeatherMap(NetatmoStationData measurements, TraceWriter log)
+        private static async Task<bool> PostMeasurement(NetatmoStationData measurements, TraceWriter log)
         {
             bool success = true;
             using (var http = new HttpClient())
@@ -118,7 +119,7 @@ namespace NetatmoOpenWeatherMapUpdater
                 measurements[0].Humidity = humidity.Value;
             }
 
-            return OpenWeatherMapMeasurementSerialize.ToJson(measurements);
+            return JsonExtensions.ToJson(measurements);
         }
     }
 }

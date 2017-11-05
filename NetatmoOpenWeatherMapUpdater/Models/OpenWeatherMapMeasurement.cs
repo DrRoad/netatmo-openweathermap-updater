@@ -23,11 +23,6 @@
         public static List<OpenWeatherMapMeasurement> FromJson(string json) => JsonConvert.DeserializeObject<List<OpenWeatherMapMeasurement>>(json, OpenWeatherMapMeasurementConverter.Settings);
     }
 
-    public static class OpenWeatherMapMeasurementSerialize
-    {
-        public static string ToJson(this List<OpenWeatherMapMeasurement> self) => JsonConvert.SerializeObject(self, OpenWeatherMapMeasurementConverter.Settings);
-    }
-
     public class OpenWeatherMapMeasurementConverter
     {
         public static readonly JsonSerializerSettings Settings = new JsonSerializerSettings

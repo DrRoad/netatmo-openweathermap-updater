@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace NetatmoOpenWeatherMapUpdater
 {
-    public static class GetMeasurements
+    public static class GetNetatmoMeasurements
     {
         // Names of the environment variables to get the values from
         private const string EnvNetatmoClientId = "NETATMO_CLIENT_ID";
@@ -37,10 +37,10 @@ namespace NetatmoOpenWeatherMapUpdater
         /// <returns></returns>
         [FunctionName("GetMeasurements")]
         public static async Task Run(
-            [TimerTrigger("0 0 * * * *")]TimerInfo myTimer,
+            [TimerTrigger("0 2 * * * *")]TimerInfo myTimer,
             [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
+            [Queue("%QUEUE_TABLESTORAGE%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToTableStorage,
             [Queue("%QUEUE_SLACK%", Connection = "StorageConnectionString")] ICollector<string> outputToSlack,
-            [Table("%TABLE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> tableStorage,
             TraceWriter log)
         {
             log.Info($"Getting measurements from Netatmo weather station at: {DateTime.Now.ToString(DateTimeFormat)}");
@@ -74,30 +74,33 @@ namespace NetatmoOpenWeatherMapUpdater
             var temperature = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Temperature;
             var humidity = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Humidity;
             var timestamp = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.TimeUtc;
-            string ts = string.Empty;
-            if (timestamp.HasValue)
-            {
-                ts = DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).UtcDateTime.ToString(DateTimeFormat);
-            }
-            log.Info($"Got measurements: timestamp (UTC) = {ts}, temperature = {temperature}, humidity = {humidity}");
+            log.Info($"Got measurements: temperature = {temperature}, humidity = {humidity}");
 
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
             queueToOpenWeatherMap.Add(measurements);
+            queueToTableStorage.Add(measurements);
 
-            tableStorage.Add(measurements);
-
-            var postToSlack = Environment.GetEnvironmentVariable(EnvPostToSlack);
-            if (!string.IsNullOrEmpty(postToSlack) && postToSlack.Equals("true")) {
-                var messageToSlack = new
-                {
-                    TimestampUtc = ts,
-                    Temperature = temperature.Value,
-                    Humidity = humidity.Value
-                };
-                outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
-            }
+            // If configured, send a message to the queue for a Logic App to post to Slack.
+            PostToSlackQueue(outputToSlack, temperature, humidity, timestamp);
         }
 
+        private static void PostToSlackQueue(ICollector<string> outputToSlack, double? temperature, long? humidity, long? timestamp)
+        {
+            var postToSlack = Environment.GetEnvironmentVariable(EnvPostToSlack);
+            if (!string.IsNullOrEmpty(postToSlack) && postToSlack.Equals("true"))
+            {
+                if (timestamp.HasValue)
+                {
+                    var messageToSlack = new
+                    {
+                        TimestampUtc = DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).UtcDateTime.ToString(DateTimeFormat),
+                        Temperature = temperature.Value,
+                        Humidity = humidity.Value
+                    };
+                    outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
+                }
+            }
+        }
 
         /// <summary>
         /// Get an access token for the Netatmo API.
@@ -159,7 +162,7 @@ namespace NetatmoOpenWeatherMapUpdater
 
             if (string.IsNullOrEmpty(accessTokenExpiresAtString))
             {
-               return false;
+                return false;
             }
 
             if (!DateTime.TryParse(accessTokenExpiresAtString, out DateTime accessTokenExpiresAt))
@@ -173,7 +176,8 @@ namespace NetatmoOpenWeatherMapUpdater
             {
                 log.Info($"Access token has expired, need to get new one");
                 return false;
-            } else
+            }
+            else
             {
                 var diff = accessTokenExpiresAt - now;
                 log.Info($"We still have valid access token for {diff} until {accessTokenExpiresAt.ToString()}");
