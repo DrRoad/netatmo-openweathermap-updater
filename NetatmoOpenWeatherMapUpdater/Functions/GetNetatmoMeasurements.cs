@@ -37,7 +37,7 @@ namespace NetatmoOpenWeatherMapUpdater
         /// <returns></returns>
         [FunctionName("GetMeasurements")]
         public static async Task Run(
-            [TimerTrigger("0 2 * * * *")]TimerInfo myTimer,
+            [TimerTrigger("0 */20 * * * *")]TimerInfo myTimer,
             [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
             [Queue("%QUEUE_TABLESTORAGE%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToTableStorage,
             [Queue("%QUEUE_SLACK%", Connection = "StorageConnectionString")] ICollector<string> outputToSlack,
