@@ -6,7 +6,7 @@
     public partial class OpenWeatherMapMeasurement
     {
         [JsonProperty("dt")]
-        public string Dt { get; set; }
+        public long Dt { get; set; }
 
         [JsonProperty("humidity")]
         public long Humidity { get; set; }

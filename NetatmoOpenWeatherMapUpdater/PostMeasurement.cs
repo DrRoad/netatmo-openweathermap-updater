@@ -109,7 +109,7 @@ namespace NetatmoOpenWeatherMapUpdater
 
             if (timestamp.HasValue)
             {
-                measurements[0].Dt = $"{timestamp.Value}";
+                measurements[0].Dt = timestamp.Value;
             }
             else
             {
