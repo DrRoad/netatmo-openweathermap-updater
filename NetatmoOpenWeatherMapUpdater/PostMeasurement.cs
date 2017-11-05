@@ -56,7 +56,6 @@ namespace NetatmoOpenWeatherMapUpdater
                 }
 
                 var uri = $"{OpenWeatherMapPostMeasurementUri}?APPID={key}";
-                log.Info($"Uri: {uri}");
 
                 var postJSON = CreatePostJSON(measurements, stationId, log);
                 if (!string.IsNullOrEmpty(postJSON))

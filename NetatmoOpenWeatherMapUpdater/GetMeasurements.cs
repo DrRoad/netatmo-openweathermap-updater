@@ -72,8 +72,14 @@ namespace NetatmoOpenWeatherMapUpdater
 
             var temperature = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Temperature;
             var humidity = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Humidity;
+            var timestamp = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.TimeUtc;
+            string ts = string.Empty;
+            if (timestamp.HasValue)
+            {
+                ts = DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).UtcDateTime.ToString(DateTimeFormat);
+            }
             //var pressure = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Pressure;
-            log.Info($"Got measurements: temperature = {temperature}, humidity = {humidity}");
+            log.Info($"Got measurements: timestamp (UTC) = {ts}, temperature = {temperature}, humidity = {humidity}");
 
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
             queueToOpenWeatherMap.Add(measurements);
