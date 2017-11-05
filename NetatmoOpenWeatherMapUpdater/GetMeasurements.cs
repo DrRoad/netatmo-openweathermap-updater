@@ -20,6 +20,7 @@ namespace NetatmoOpenWeatherMapUpdater
         private const string EnvNetatmoAccessTokenExpiresAt = "NETATMO_ACCESS_TOKEN_EXPIRES_AT";
         private const string EnvNetatmoRefreshToken = "NETATMO_REFRESH_TOKEN";
         private const string EnvNetatmoAccessTokenRefreshAsNeeded = "NETATMO_NEED_TO_REFESH_TOKEN";
+        private const string EnvPostToSlack = "POST_TO_SLACK";
 
         // URIs
         private const string NetatmoUriAccessToken = "https://api.netatmo.com/oauth2/token";
@@ -81,7 +82,10 @@ namespace NetatmoOpenWeatherMapUpdater
                 Temperature = temperature.Value,
                 Humidity = humidity.Value
             };
-            outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
+            var postToSlack = Environment.GetEnvironmentVariable(EnvPostToSlack);
+            if (!string.IsNullOrEmpty(postToSlack) && postToSlack.Equals("true")) { 
+                outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
+            }
         }
 
 
