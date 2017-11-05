@@ -84,6 +84,7 @@ namespace NetatmoOpenWeatherMapUpdater
             queueToOpenWeatherMap.Add(measurements);
 
             var messageToSlack = new {
+                TimestampUtc = ts,
                 Temperature = temperature.Value,
                 Humidity = humidity.Value
             };

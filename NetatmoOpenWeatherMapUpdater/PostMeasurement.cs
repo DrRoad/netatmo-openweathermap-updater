@@ -19,7 +19,6 @@ namespace NetatmoOpenWeatherMapUpdater
 
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
-        // ?APPID={{key}}
         [FunctionName("PostMeasurement")]
         public static async Task Run(
             [QueueTrigger("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")]NetatmoStationData measurements,

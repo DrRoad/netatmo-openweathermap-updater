@@ -16,6 +16,26 @@
     "definition": {
         "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
         "actions": {
+            "Delete_message": {
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                        }
+                    },
+                    "method": "delete",
+                    "path": "/@{encodeURIComponent('slack')}/messages/@{encodeURIComponent(triggerBody()?['MessageId'])}",
+                    "queries": {
+                        "popreceipt": "@triggerBody()?['PopReceipt']"
+                    }
+                },
+                "runAfter": {
+                    "Post_message": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection"
+            },
             "Parse_JSON": {
                 "inputs": {
                     "content": "@triggerBody()?['MessageText']",
@@ -26,6 +46,9 @@
                             },
                             "Temperature": {
                                 "type": "number"
+                            },
+                            "TimestampUtc": {
+                                "type": "string"
                             }
                         },
                         "type": "object"
@@ -45,7 +68,7 @@
                     "path": "/chat.postMessage",
                     "queries": {
                         "channel": "C5TD51R96",
-                        "text": "Current temperature in Berlin, Mitte, 10115: @{body('Parse_JSON')?['Temperature']}C and humidity @{body('Parse_JSON')?['Humidity']}%"
+                        "text": "Temperature in Berlin, Mitte, 10115 at @{body('Parse_JSON')?['TimestampUtc']} is @{body('Parse_JSON')?['Temperature']}C and humidity @{body('Parse_JSON')?['Humidity']}%"
                     }
                 },
                 "runAfter": {
@@ -77,7 +100,7 @@
                 },
                 "recurrence": {
                     "frequency": "Minute",
-                    "interval": 2
+                    "interval": 5
                 },
                 "splitOn": "@triggerBody()?['QueueMessagesList']?['QueueMessage']",
                 "type": "ApiConnection"
