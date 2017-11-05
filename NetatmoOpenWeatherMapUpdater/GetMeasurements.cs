@@ -26,6 +26,7 @@ namespace NetatmoOpenWeatherMapUpdater
 
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
+
         /// <summary>
         /// Asynchronous function triggered every 20 minutes.
         /// </summary>
@@ -33,14 +34,12 @@ namespace NetatmoOpenWeatherMapUpdater
         /// <param name="log">TraceWriter to log to</param>
         /// <returns></returns>
         [FunctionName("GetMeasurements")]
-        public static async Task Run([TimerTrigger("0 */20 * * * *")]TimerInfo myTimer, TraceWriter log)
+        public static async Task Run(
+            [TimerTrigger("0 */20 * * * *")]TimerInfo myTimer,
+            [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> outputQueueItem,
+            TraceWriter log)
         {
-            log.Info($"EnvNetatmoAccessTokenRefreshAsNeeded: {Environment.GetEnvironmentVariable(EnvNetatmoAccessTokenRefreshAsNeeded)}");
-            log.Info($"EnvNetatmoAccessToken: {Environment.GetEnvironmentVariable(EnvNetatmoAccessToken)}");
-            log.Info($"EnvNetatmoAccessTokenExpiresAt: {Environment.GetEnvironmentVariable(EnvNetatmoAccessTokenExpiresAt)}");
-            log.Info($"EnvNetatmoRefreshToken: {Environment.GetEnvironmentVariable(EnvNetatmoRefreshToken)}");
-
-            log.Info($"Getting measurements from weather station at: {DateTime.Now.ToString(DateTimeFormat)}");
+            log.Info($"Getting measurements from Netatmo weather station at: {DateTime.Now.ToString(DateTimeFormat)}");
 
             // First get the Netatmo API access token
             var accessToken = await GetAccessToken(log);
@@ -67,7 +66,14 @@ namespace NetatmoOpenWeatherMapUpdater
                 return;
             }
 
-            log.Info($"Got measurement: {measurements.ToString()}");
+
+            var temperature = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Temperature;
+            var humidity = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Humidity;
+            //var pressure = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Pressure;
+            log.Info($"Got measurements: temperature = {temperature}, humidity = {humidity}");
+
+            // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
+            outputQueueItem.Add(measurements);
         }
 
 
@@ -83,7 +89,6 @@ namespace NetatmoOpenWeatherMapUpdater
             // If we have a non-expired access token
             if (HaveValidAccessToken(log))
             {
-                log.Info($"Using existing access token");
                 accessToken = Environment.GetEnvironmentVariable(EnvNetatmoAccessToken);
             }
             else
@@ -95,7 +100,7 @@ namespace NetatmoOpenWeatherMapUpdater
 
                 if (string.IsNullOrEmpty(needRefresh) || !needRefresh.Equals("true"))
                 {
-                    log.Info($"Getting a new access token");
+                    log.Info($"Getting a new access token...");
                     tokenObject = await GetNewAccessToken(log);
                 }
                 else
@@ -107,19 +112,12 @@ namespace NetatmoOpenWeatherMapUpdater
                 {
                     var now = DateTime.UtcNow;
                     var expiresAt = DateTime.UtcNow.AddSeconds(tokenObject.ExpiresIn);
-                    log.Info($"");
 
                     Environment.SetEnvironmentVariable(EnvNetatmoAccessTokenRefreshAsNeeded, "true");
                     Environment.SetEnvironmentVariable(EnvNetatmoAccessToken, tokenObject.AccessToken);
                     Environment.SetEnvironmentVariable(EnvNetatmoAccessTokenExpiresAt, expiresAt.ToString());
                     Environment.SetEnvironmentVariable(EnvNetatmoRefreshToken, tokenObject.RefreshToken);
                 }
-
-                log.Info($"Updated the token:");
-                log.Info($"EnvNetatmoAccessTokenRefreshAsNeeded: {Environment.GetEnvironmentVariable(EnvNetatmoAccessTokenRefreshAsNeeded)}");
-                log.Info($"EnvNetatmoAccessToken: {Environment.GetEnvironmentVariable(EnvNetatmoAccessToken)}");
-                log.Info($"EnvNetatmoAccessTokenExpiresAt: {Environment.GetEnvironmentVariable(EnvNetatmoAccessTokenExpiresAt)}");
-                log.Info($"EnvNetatmoRefreshToken: {Environment.GetEnvironmentVariable(EnvNetatmoRefreshToken)}");
 
                 accessToken = tokenObject?.AccessToken;
             }
@@ -135,13 +133,11 @@ namespace NetatmoOpenWeatherMapUpdater
         /// <returns>bool</returns>
         private static bool HaveValidAccessToken(TraceWriter log)
         {
-            log.Info($"Checking if we have a valid access token...");
             var accessTokenExpiresAtString = Environment.GetEnvironmentVariable(EnvNetatmoAccessTokenExpiresAt);
 
             if (string.IsNullOrEmpty(accessTokenExpiresAtString))
             {
-                log.Info("No access token expiry stored, need to get a token");
-                return false;
+               return false;
             }
 
             if (!DateTime.TryParse(accessTokenExpiresAtString, out DateTime accessTokenExpiresAt))
@@ -151,7 +147,6 @@ namespace NetatmoOpenWeatherMapUpdater
             }
             var now = DateTime.UtcNow;
 
-            log.Info($"{now.ToString(DateTimeFormat)} >= {accessTokenExpiresAt.ToString(DateTimeFormat)}");
             if (now.CompareTo(accessTokenExpiresAt) > 0)
             {
                 log.Info($"Access token has expired, need to get new one");
@@ -188,7 +183,6 @@ namespace NetatmoOpenWeatherMapUpdater
                     { "access_token", Environment.GetEnvironmentVariable(EnvNetatmoAccessToken)},
                     { "refresh_token", Environment.GetEnvironmentVariable(EnvNetatmoRefreshToken)},
                 };
-                log.Info($"Refreshing access-token for client ID: {clientId}");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, NetatmoUriAccessToken) { Content = new FormUrlEncodedContent(parameters) };
                 var response = await http.SendAsync(request);
@@ -226,7 +220,6 @@ namespace NetatmoOpenWeatherMapUpdater
                     { "grant_type", "password" },
                     { "scope", "read_station" }
                 };
-                log.Info($"Getting access-token for client ID: {clientId}");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, NetatmoUriAccessToken) { Content = new FormUrlEncodedContent(parameters) };
                 var response = await http.SendAsync(request);
@@ -254,11 +247,10 @@ namespace NetatmoOpenWeatherMapUpdater
         private static async Task<NetatmoStationData> GetStationData(string accessToken, string netatmoStationId, TraceWriter log)
         {
             NetatmoStationData data = null;
-            log.Info($"Getting weather data from station {netatmoStationId} with access_token {accessToken}");
+            log.Info($"Getting weather data from Netatmo station {netatmoStationId}");
             using (var http = new HttpClient())
             {
                 var uri = $"{NetatmoUriGetStationData}?access_token={accessToken}&device_id={netatmoStationId}";
-                log.Info($"URI: {uri}");
 
                 var response = await http.GetAsync(uri);
                 if (response.IsSuccessStatusCode)
