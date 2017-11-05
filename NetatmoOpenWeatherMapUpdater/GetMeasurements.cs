@@ -4,6 +4,7 @@ using Microsoft.Azure.WebJobs.Host;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace NetatmoOpenWeatherMapUpdater
 {
@@ -35,8 +36,9 @@ namespace NetatmoOpenWeatherMapUpdater
         /// <returns></returns>
         [FunctionName("GetMeasurements")]
         public static async Task Run(
-            [TimerTrigger("0 */20 * * * *")]TimerInfo myTimer,
-            [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> outputQueueItem,
+            [TimerTrigger("0 0 * * * *")]TimerInfo myTimer,
+            [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
+            [Queue("%QUEUE_SLACK%", Connection = "StorageConnectionString")] ICollector<string> outputToSlack,
             TraceWriter log)
         {
             log.Info($"Getting measurements from Netatmo weather station at: {DateTime.Now.ToString(DateTimeFormat)}");
@@ -73,7 +75,13 @@ namespace NetatmoOpenWeatherMapUpdater
             log.Info($"Got measurements: temperature = {temperature}, humidity = {humidity}");
 
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
-            outputQueueItem.Add(measurements);
+            queueToOpenWeatherMap.Add(measurements);
+
+            var messageToSlack = new {
+                Temperature = temperature.Value,
+                Humidity = humidity.Value
+            };
+            outputToSlack.Add(JsonConvert.SerializeObject(messageToSlack));
         }
 
 
