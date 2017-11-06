@@ -38,7 +38,8 @@ namespace NetatmoOpenWeatherMapUpdater
         [FunctionName("GetMeasurements")]
         public static async Task Run(
             [TimerTrigger("0 */20 * * * *")]TimerInfo myTimer,
-            [Queue("%QUEUE_MEASUREMENTS%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
+            [Queue("%QUEUE_MEASUREMENTS_OWM%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToOpenWeatherMap,
+            [Queue("%QUEUE_MEASUREMENTS_WU%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToWeatherUnderground,
             [Queue("%QUEUE_TABLESTORAGE%", Connection = "StorageConnectionString")] ICollector<NetatmoStationData> queueToTableStorage,
             [Queue("%QUEUE_SLACK%", Connection = "StorageConnectionString")] ICollector<string> outputToSlack,
             TraceWriter log)
@@ -78,6 +79,7 @@ namespace NetatmoOpenWeatherMapUpdater
 
             // For decoupling we just publish the measurement to our Storage Queue and let PostMeasurement handle it
             queueToOpenWeatherMap.Add(measurements);
+            queueToWeatherUnderground.Add(measurements);
             queueToTableStorage.Add(measurements);
 
             // If configured, send a message to the queue for a Logic App to post to Slack.
