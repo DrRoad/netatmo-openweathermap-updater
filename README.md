@@ -9,7 +9,7 @@ The application consists of three independent functions
   This function accesses the latest weather measurement from your NetAtmo weather station and publishes it to a Storage Queue. As a secondary function it posts a simple JSON message to another queue where a Logic App posts it to Slack. You can disable this by setting POST_TO_SLACK environment variable to "false". The function also stores each NetAtmo measurements message to Table Storage for later analysis.
 2. **UpdateOpenWeatherMap**
   This functions listens on the Storage Queue. When a new measurement is published in the queue it processes it and posts the data to OpenWeatherMap.
-3. UpdateWeatherUnderground
+3. **UpdateWeatherUnderground**
   This function listens on another Storage Queue and posts to WU when a new measurement is received.
 
 ## Environment
@@ -24,7 +24,10 @@ NETATMO_EMAIL == your NetAtmo email address
 NETATMO_PASSWORD == your NetAtmo password
 NETATMO_STATION_ID == The station id for your NetAtmo station
 
-QUEUE_MEASUREMENTS == Queue name used to publish measurements between the two functions
+QUEUE_MEASUREMENTS_OWM == Queue to publish measurements for the OWM posting function
+QUEUE_MEASUREMENTS_WU == Queue to publish measurements for the WU posting function
+QUEUE_TABLESTORAGE == Queue to publish measurements for Table Storage function
+
 TABLE_MEASUREMENTS == Table Storage table name where to store each NetAtmo measurement message
 
 OPENWEATHERMAP_KEY == OpenWeatherMap API key
