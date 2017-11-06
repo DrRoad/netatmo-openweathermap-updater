@@ -9,23 +9,23 @@ using NetatmoOpenWeatherMapUpdater.Helpers;
 
 namespace NetatmoOpenWeatherMapUpdater
 {
-    public static class PostMeasurementToOpenWeatherMap
+    public static class PostMeasurementToWeatherUnderground
     {
         // Names of the environment variables to get the values from
-        private const string EnvOpenWeatherMapAppKey = "OPENWEATHERMAP_KEY";
-        private const string EnvOpenWeatherMapStationId = "OPENWEATHERMAP_STATION_ID";
+        private const string EnvWundergroundStationId = "WUNDERGROUND_ID";
+        private const string EnvWundergroundStationKey = "WUNDERGROUND_KEY";
 
         // URIs
-        private const string OpenWeatherMapPostMeasurementUri = "http://api.openweathermap.org/data/3.0/measurements";
+        private const string WeatherUndergroundPostMeasurementUri = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
 
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
-        [FunctionName("UpdateOpenWeatherMap")]
+        [FunctionName("UpdateWeatherUnderground")]
         public static async Task Run(
-            [QueueTrigger("%QUEUE_MEASUREMENTS_OWM%", Connection = "StorageConnectionString")]NetatmoStationData measurements,
+            [QueueTrigger("%QUEUE_MEASUREMENTS_WU%", Connection = "StorageConnectionString")]NetatmoStationData measurements,
             TraceWriter log)
         {
-            log.Info($"Posting measurements to OpenWeatherMap at: {DateTime.Now.ToString(DateTimeFormat)}");
+            log.Info($"Posting measurements to Weather Underground at: {DateTime.Now.ToString(DateTimeFormat)}");
 
             await PostMeasurement(measurements, log);
         }
@@ -35,43 +35,39 @@ namespace NetatmoOpenWeatherMapUpdater
             bool success = true;
             using (var http = new HttpClient())
             {
-                var key = Environment.GetEnvironmentVariable(EnvOpenWeatherMapAppKey);
-                var stationId = Environment.GetEnvironmentVariable(EnvOpenWeatherMapStationId);
+                var stationId = Environment.GetEnvironmentVariable(EnvWundergroundStationId);
+                var key = Environment.GetEnvironmentVariable(EnvWundergroundStationKey);
                 if (string.IsNullOrEmpty(key))
                 {
-                    log.Error($"ERROR no {EnvOpenWeatherMapAppKey} set");
+                    log.Error($"ERROR no {EnvWundergroundStationKey} set");
                     return false;
                 }
                 if (string.IsNullOrEmpty(stationId))
                 {
-                    log.Error($"ERROR no {EnvOpenWeatherMapStationId} set");
+                    log.Error($"ERROR no {EnvWundergroundStationId} set");
                     return false;
                 }
 
-                var uri = $"{OpenWeatherMapPostMeasurementUri}?APPID={key}";
+                var timestamp = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.TimeUtc;
+                var temperature = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Temperature;
+                var humidity = measurements.Body?.Devices?[0]?.Modules?[0]?.DashboardData?.Humidity;
+                var pressure = measurements.Body?.Devices?[0]?.DashboardData?.AbsolutePressure;
 
-                var postJSON = CreatePostJSON(measurements, stationId, log);
-                if (!string.IsNullOrEmpty(postJSON))
+                var tempF = UnitConversions.FromCelsiusToFahrenheit(temperature.Value);
+                var inHg = UnitConversions.InHgFromMillibars(pressure.Value);
+                var uri = $"{WeatherUndergroundPostMeasurementUri}?action=updateraw&dateutc=={timestamp.Value}&tempf={tempF}&humidity={humidity.Value}&baromin={inHg}&ID={stationId}&PASSWORD={key}";
+
+                log.Info($"URI: {uri}");
+                var response = await http.GetAsync(uri);
+
+                if (response.IsSuccessStatusCode)
                 {
-
-                    log.Info($"Post JSON: {postJSON}");
-                    var request = new HttpRequestMessage(HttpMethod.Post, uri) {
-                        Content = new StringContent(postJSON, Encoding.UTF8, "application/json")
-                    };
-                    var response = await http.SendAsync(request);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        log.Info($"Measurement posted succesfully. {response.StatusCode} - {response.ReasonPhrase}");
-                        success = true;
-                    }
-                    else
-                    {
-                        log.Error($"ERROR posting measurement: {response.StatusCode} - {response.ReasonPhrase}");
-                        success = false;
-                    }
-                } else
+                    log.Info($"Measurement posted succesfully. {response.StatusCode} - {response.ReasonPhrase}");
+                    success = true;
+                }
+                else
                 {
+                    log.Error($"ERROR posting measurement: {response.StatusCode} - {response.ReasonPhrase}");
                     success = false;
                 }
             }
